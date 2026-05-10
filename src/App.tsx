@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { createResult, createSession, getElapsedMs, pauseSession, resumeSession, selectBoardValue } from "./lib/game/session";
 import { loadHistory, saveResult } from "./lib/storage/history";
@@ -7,7 +7,7 @@ import { HomePage } from "./pages/HomePage";
 import { ModePage } from "./pages/ModePage";
 import { ResultPage } from "./pages/ResultPage";
 import { TrainingPage } from "./pages/TrainingPage";
-import type { GameConfig, GameResult, GameSession } from "./types/game";
+import type { BoardSize, GameConfig, GameResult, GameSession } from "./types/game";
 
 type Screen = "home" | "mode" | "training" | "result" | "history";
 
@@ -23,8 +23,22 @@ function App() {
   const [result, setResult] = useState<GameResult | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  // Map of board size -> best result for that size (updated incrementally)
+  const bestBySize = useRef<Map<BoardSize, GameResult>>(new Map());
+  const [bestResult, setBestResult] = useState<GameResult | null>(() => {
+    const initial = loadHistory();
+    for (const entry of initial) {
+      const existing = bestBySize.current.get(entry.size);
+      if (!existing || entry.durationMs < existing.durationMs) {
+        bestBySize.current.set(entry.size, entry);
+      }
+    }
+    const all = [...bestBySize.current.values()];
+    return all.length ? all.reduce((a, b) => (a.durationMs < b.durationMs ? a : b)) : null;
+  });
+
   useEffect(() => {
-    if (!session || session.runningSinceMs === null) {
+    if (session?.runningSinceMs === null) {
       return undefined;
     }
 
@@ -35,23 +49,12 @@ function App() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [session]);
-
-  const bestResult = useMemo(
-    () =>
-      history.reduce<GameResult | null>(
-        (best, entry) => (best === null || entry.durationMs < best.durationMs ? entry : best),
-        null,
-      ),
-    [history],
-  );
+  }, [session?.runningSinceMs]);
 
   const elapsedMs = session ? getElapsedMs(session, now) : 0;
 
   function openScreen(nextScreen: Screen): void {
-    startTransition(() => {
-      setScreen(nextScreen);
-    });
+    setScreen(nextScreen);
   }
 
   function handleStartFromMode(): void {
@@ -80,7 +83,14 @@ function App() {
 
     if (nextStep.completed) {
       const nextResult = createResult(nextStep.session, currentTime, history);
-      setHistory(saveResult(nextResult));
+      const nextHistory = saveResult(nextResult, history);
+      setHistory(nextHistory);
+      if (nextResult.best) {
+        bestBySize.current.set(nextResult.size, nextResult);
+        setBestResult((prev) =>
+          !prev || nextResult.durationMs < prev.durationMs ? nextResult : prev,
+        );
+      }
       setResult(nextResult);
       setSession(null);
       openScreen("result");

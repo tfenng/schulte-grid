@@ -46,15 +46,20 @@ class MockAudioContext {
     };
   }
   createGain() {
-    return {
+    const gainNode = {
       connect: () => {},
       disconnect: () => {},
       gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+    };
+    return {
+      ...gainNode,
+      exponentialRampToValueAtTime: gainNode.gain.exponentialRampToValueAtTime,
     };
   }
   get currentTime() {
     return 0;
   }
+  close() {}
 }
 
 Object.defineProperty(window, "AudioContext", {
