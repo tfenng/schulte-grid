@@ -16,38 +16,32 @@ interface TrainingPageProps {
   onExit: () => void;
 }
 
-function playCorrectSound() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(523, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(784, ctx.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.15);
-  } catch (_) {}
+function playCorrectSound(ctx: AudioContext) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(523, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(784, ctx.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.15);
 }
 
-function playWrongSound() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(220, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.2);
-  } catch (_) {}
+function playWrongSound(ctx: AudioContext) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(220, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.12);
+  gain.gain.setValueAtTime(0.25, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.2);
 }
 
 export function TrainingPage({
@@ -59,17 +53,22 @@ export function TrainingPage({
 }: TrainingPageProps) {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Lazy init: created on first click to avoid StrictMode unmount closing it
+  const audioCtx = useRef<AudioContext | null>(null);
   const paused = session.runningSinceMs === null;
 
-  // Evaluate correct/wrong against the current session state — recalculated each render
-  const handleClick = useCallback(
+  const handleCellClick = useCallback(
     (value: number) => {
+      if (!audioCtx.current) {
+        audioCtx.current = new AudioContext();
+      }
+
       const correct = value === session.completedCount + 1;
 
       if (correct) {
-        playCorrectSound();
+        playCorrectSound(audioCtx.current);
       } else {
-        playWrongSound();
+        playWrongSound(audioCtx.current);
       }
 
       setFeedback({ value, correct });
@@ -154,7 +153,7 @@ export function TrainingPage({
         paused={paused}
         completedCount={session.completedCount}
         feedback={feedback}
-        onClick={handleClick}
+        onClick={handleCellClick}
       />
     </section>
   );
