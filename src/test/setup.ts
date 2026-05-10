@@ -32,3 +32,32 @@ Object.defineProperty(window, "localStorage", {
   value: new MemoryStorage(),
   configurable: true,
 });
+
+// Mock AudioContext for jsdom environment
+class MockAudioContext {
+  createOscillator() {
+    return {
+      connect: () => {},
+      disconnect: () => {},
+      type: "",
+      frequency: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+      start: () => {},
+      stop: () => {},
+    };
+  }
+  createGain() {
+    return {
+      connect: () => {},
+      disconnect: () => {},
+      gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+    };
+  }
+  get currentTime() {
+    return 0;
+  }
+}
+
+Object.defineProperty(window, "AudioContext", {
+  value: MockAudioContext,
+  configurable: true,
+});
